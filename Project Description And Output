@@ -11,94 +11,12 @@ Scoring is based on:
 
 10% for meaningful insights
 
-solution:  
+STEPS I DID:  
 
-# STEP 1: Import libraries
-import pandas as pd
-import os
+I imported the necessary libraries like pandas and os. Then I loaded all the CSV files such as user, user registration, plan, user play sessions, and payment details into DataFrames. After loading, I merged relevant tables to create dimension tables like dim_user (which combines user and registration info), dim_plan (contains plan details), and dim_payment (has payment details).
 
-# STEP 2: Load data
-data_path = "."
+Next, I created two fact tables: fact_play, which merges play sessions with channel and status information, and fact_user_plan, which combines user plans, payment, and plan info. I performed data quality checks to ensure there were no duplicate user IDs and handled missing values by filling them with 'Unknown'.
 
-user = pd.read_csv(os.path.join(data_path, "user.csv"))
-user_registration = pd.read_csv(os.path.join(data_path, "user_registration.csv"))
-user_plan = pd.read_csv(os.path.join(data_path, "user_plan.csv"))
-user_payment_detail = pd.read_csv(os.path.join(data_path, "user_payment_detail.csv"))
-user_play_session = pd.read_csv(os.path.join(data_path, "user_play_session.csv"))
-channel_code = pd.read_csv(os.path.join(data_path, "channel_code.csv"))
-status_code = pd.read_csv(os.path.join(data_path, "status_code.csv"))
-plan = pd.read_csv(os.path.join(data_path, "plan.csv"))
+To generate insights, I checked how many game sessions happened on browser vs mobile. The result showed 941 sessions on browser and 931 on mobile, which means both platforms are equally popular. Then I checked how many users used onetime payment vs subscription plans, which came out almost evenly split (ONETIME: 75, MONTHLY: 74, ANNUALLY: 66). Finally, I calculated the total gross revenue from all user plans, which was $1,930.85.
 
-# STEP 3: Create dimension tables
-dim_user = user.merge(user_registration, on="user_id", how="left")
-dim_user = dim_user[["user_id", "username", "first_name", "last_name", "email_y", "ip_address", "social_media_handle"]]
-dim_user.rename(columns={"email_y": "email"}, inplace=True)
-
-dim_plan = plan.copy()
-dim_payment = user_payment_detail.copy()
-
-# STEP 4: Create fact tables
-fact_play = user_play_session \
-    .merge(channel_code, left_on="channel_code", right_on="play_session_channel_code", how="left") \
-    .merge(status_code, left_on="status_code", right_on="play_session_status_code", how="left") \
-    .merge(user, on="user_id", how="left")
-
-fact_user_plan = user_plan \
-    .merge(plan, on="plan_id", how="left") \
-    .merge(user_payment_detail, on="payment_detail_id", how="left")
-
-# STEP 5: Data Quality Checks
-print(" Running Data Quality Checks...")
-assert dim_user['user_id'].is_unique, " user_id not unique in dim_user"
-
-if fact_play.isnull().sum().sum() > 0:
-    print("Missing values in fact_play — filling with 'Unknown'")
-    fact_play.fillna("Unknown", inplace=True)
-
-if fact_user_plan.isnull().sum().sum() > 0:
-    print("Missing values in fact_user_plan — filling with 'Unknown'")
-    fact_user_plan.fillna("Unknown", inplace=True)
-
-# STEP 6: Key Business Insights
-print("\n Insight 1: Online vs Mobile sessions")
-print(fact_play['english_description_x'].value_counts())
-
-print("\n Insight 2: Onetime vs Subscription Plans")
-print(fact_user_plan['payment_frequency_code'].value_counts())
-
-print("\n Insight 3: Gross Revenue")
-total_revenue = fact_user_plan["cost_amount"].sum()
-print(f"Total Revenue: ${total_revenue:,.2f}")
-
-# STEP 7: Export to output
-output_path = "./output"
-os.makedirs(output_path, exist_ok=True)
-
-dim_user.to_csv(f"{output_path}/dim_user.csv", index=False)
-dim_plan.to_csv(f"{output_path}/dim_plan.csv", index=False)
-dim_payment.to_csv(f"{output_path}/dim_payment.csv", index=False)
-fact_play.to_csv(f"{output_path}/fact_play.csv", index=False)
-fact_user_plan.to_csv(f"{output_path}/fact_user_plan.csv", index=False)
-
-print("\n All tables saved to ./output folder.")
-
-
-
-OUTPUT :  Running Data Quality Checks...
-Missing values in fact_play — filling with 'Unknown'
-
- Insight 1: Online vs Mobile sessions
-english_description_x
-Browser               941
-Mobile application    931
-Name: count, dtype: int64
-
- Insight 2: Onetime vs Subscription Plans
-payment_frequency_code
-ONETIME     75
-MONTHLY     74
-ANNUALLY    66
-Name: count, dtype: int64
-
- Insight 3: Gross Revenue
-Total Revenue: $1,930.85
+At the end, I saved all processed dimension and fact tables into an output folder as CSV files for future analysis or reporting. The notebook runs completely without error and provides business insights the company can use to plan for 2025.
