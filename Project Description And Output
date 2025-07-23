@@ -1,0 +1,104 @@
+# dice-game-analysis
+You are hired by a fictional game company to analyze user data from their “Dice Game” app (launched in 2024 on browser and mobile). The task involves processing user, session, payment, and registration data using Python (Pandas or PySpark), transforming it into a local data warehouse/lake using Star Schema or Data Vault 2.0, and saving the output as CSV or Parquet files. You must include unit tests or data quality checks and extract key business insights such as the number of online vs mobile sessions, one-time vs subscription payments, and total revenue.
+
+Scoring is based on:
+
+50% for a complete, error-free application
+
+30% for clean, modular, testable code
+
+10% for future extensibility
+
+10% for meaningful insights
+
+solution:  
+
+# STEP 1: Import libraries
+import pandas as pd
+import os
+
+# STEP 2: Load data
+data_path = "."
+
+user = pd.read_csv(os.path.join(data_path, "user.csv"))
+user_registration = pd.read_csv(os.path.join(data_path, "user_registration.csv"))
+user_plan = pd.read_csv(os.path.join(data_path, "user_plan.csv"))
+user_payment_detail = pd.read_csv(os.path.join(data_path, "user_payment_detail.csv"))
+user_play_session = pd.read_csv(os.path.join(data_path, "user_play_session.csv"))
+channel_code = pd.read_csv(os.path.join(data_path, "channel_code.csv"))
+status_code = pd.read_csv(os.path.join(data_path, "status_code.csv"))
+plan = pd.read_csv(os.path.join(data_path, "plan.csv"))
+
+# STEP 3: Create dimension tables
+dim_user = user.merge(user_registration, on="user_id", how="left")
+dim_user = dim_user[["user_id", "username", "first_name", "last_name", "email_y", "ip_address", "social_media_handle"]]
+dim_user.rename(columns={"email_y": "email"}, inplace=True)
+
+dim_plan = plan.copy()
+dim_payment = user_payment_detail.copy()
+
+# STEP 4: Create fact tables
+fact_play = user_play_session \
+    .merge(channel_code, left_on="channel_code", right_on="play_session_channel_code", how="left") \
+    .merge(status_code, left_on="status_code", right_on="play_session_status_code", how="left") \
+    .merge(user, on="user_id", how="left")
+
+fact_user_plan = user_plan \
+    .merge(plan, on="plan_id", how="left") \
+    .merge(user_payment_detail, on="payment_detail_id", how="left")
+
+# STEP 5: Data Quality Checks
+print(" Running Data Quality Checks...")
+assert dim_user['user_id'].is_unique, " user_id not unique in dim_user"
+
+if fact_play.isnull().sum().sum() > 0:
+    print("Missing values in fact_play — filling with 'Unknown'")
+    fact_play.fillna("Unknown", inplace=True)
+
+if fact_user_plan.isnull().sum().sum() > 0:
+    print("Missing values in fact_user_plan — filling with 'Unknown'")
+    fact_user_plan.fillna("Unknown", inplace=True)
+
+# STEP 6: Key Business Insights
+print("\n Insight 1: Online vs Mobile sessions")
+print(fact_play['english_description_x'].value_counts())
+
+print("\n Insight 2: Onetime vs Subscription Plans")
+print(fact_user_plan['payment_frequency_code'].value_counts())
+
+print("\n Insight 3: Gross Revenue")
+total_revenue = fact_user_plan["cost_amount"].sum()
+print(f"Total Revenue: ${total_revenue:,.2f}")
+
+# STEP 7: Export to output
+output_path = "./output"
+os.makedirs(output_path, exist_ok=True)
+
+dim_user.to_csv(f"{output_path}/dim_user.csv", index=False)
+dim_plan.to_csv(f"{output_path}/dim_plan.csv", index=False)
+dim_payment.to_csv(f"{output_path}/dim_payment.csv", index=False)
+fact_play.to_csv(f"{output_path}/fact_play.csv", index=False)
+fact_user_plan.to_csv(f"{output_path}/fact_user_plan.csv", index=False)
+
+print("\n All tables saved to ./output folder.")
+
+
+
+OUTPUT :  Running Data Quality Checks...
+Missing values in fact_play — filling with 'Unknown'
+
+ Insight 1: Online vs Mobile sessions
+english_description_x
+Browser               941
+Mobile application    931
+Name: count, dtype: int64
+
+ Insight 2: Onetime vs Subscription Plans
+payment_frequency_code
+ONETIME     75
+MONTHLY     74
+ANNUALLY    66
+Name: count, dtype: int64
+
+ Insight 3: Gross Revenue
+Total Revenue: $1,930.85
